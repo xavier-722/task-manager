@@ -1,101 +1,170 @@
-import Image from "next/image";
+'use client';
+import { useEffect, useReducer, useState, useTransition } from 'react';
+import { showNotification } from '@mantine/notifications';
+import { Task, getTasks, saveTasks } from '../../lib/actions/task';
+import TaskForm from '@/components/TaskForm';
+import TaskList from '@/components/TaskList';
 
-export default function Home() {
+type State = {
+  past: Task[][];
+  present: Task[];
+  future: Task[][];
+};
+
+type Action =
+  | { type: 'ADD_TASK'; task: Task }
+  | { type: 'EDIT_TASK'; task: Task }
+  | { type: 'DELETE_TASK'; id: number }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  | { type: 'SET_TASKS'; tasks: Task[] };
+
+const taskReducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case 'ADD_TASK':
+      return {
+        past: [...state.past, state.present],
+        present: [...state.present, action.task],
+        future: [],
+      };
+    case 'EDIT_TASK':
+      return {
+        past: [...state.past, state.present],
+        present: state.present.map((task) =>
+          task.id === action.task.id ? action.task : task
+        ),
+        future: [],
+      };
+    case 'DELETE_TASK':
+      return {
+        past: [...state.past, state.present],
+        present: state.present.filter((task) => task.id !== action.id),
+        future: [],
+      };
+    case 'UNDO':
+      if (state.past.length === 0) return state;
+      const previous = state.past[state.past.length - 1];
+      const newPast = state.past.slice(0, state.past.length - 1);
+      return {
+        past: newPast,
+        present: previous,
+        future: [state.present, ...state.future],
+      };
+    case 'REDO':
+      if (state.future.length === 0) return state;
+      const next = state.future[0];
+      const newFuture = state.future.slice(1);
+      return {
+        past: [...state.past, state.present],
+        present: next,
+        future: newFuture,
+      };
+    case 'SET_TASKS':
+      return {
+        past: [],
+        present: action.tasks,
+        future: [],
+      };
+    default:
+      return state;
+  }
+};
+
+export default function TaskManager() {
+  const [state, dispatch] = useReducer(taskReducer, {
+    past: [],
+    present: [],
+    future: [],
+  } as State);
+  const [isPending, startTransition] = useTransition();
+  const [editTask, setEditTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const tasks = await getTasks();
+      dispatch({ type: 'SET_TASKS', tasks });
+    };
+    fetchTasks();
+  }, []);
+
+  useEffect(() => {
+    const saveCurrentTasks = async () => {
+      await saveTasks(state.present);
+    };
+    saveCurrentTasks();
+  }, [state.present]);
+
+  const handleAddTask = (title: string, description: string) => {
+    const newTask: Task = {
+      id: Date.now(),
+      title,
+      description,
+    };
+    startTransition(() => {
+      dispatch({ type: 'ADD_TASK', task: newTask });
+      showNotification({ message: 'Task added successfully', color: 'green' });
+    });
+  };
+
+  const handleEditTask = (title: string, description: string) => {
+    if (editTask) {
+      const updatedTask: Task = {
+        ...editTask,
+        title,
+        description,
+      };
+      startTransition(() => {
+        dispatch({ type: 'EDIT_TASK', task: updatedTask });
+        setEditTask(null);
+        showNotification({ message: 'Task updated successfully', color: 'green' });
+      });
+    }
+  };
+
+  const handleDeleteTask = (id: number) => {
+    startTransition(() => {
+      dispatch({ type: 'DELETE_TASK', id });
+      showNotification({ message: 'Task deleted successfully', color: 'green' });
+    });
+  };
+
+  const handleUndo = () => {
+    dispatch({ type: 'UNDO' });
+  };
+
+  const handleRedo = () => {
+    dispatch({ type: 'REDO' });
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div style={{ fontFamily: 'Arial, sans-serif', padding: '20px', backgroundColor: '#fff', color: '#333' }}>
+      <h1>TASK MANAGER</h1>
+      <TaskForm
+        onSubmit={editTask ? handleEditTask : handleAddTask}
+        initialTitle={editTask?.title}
+        initialDescription={editTask?.description}
+        buttonText={editTask ? 'UPDATE YOUR TASK' : 'ADD TASK'}
+      />
+      <TaskList tasks={state.present} onEdit={setEditTask} onDelete={handleDeleteTask} />
+      <div style={{ marginTop: '20px' }}>
+        <button onClick={handleUndo} disabled={state.past.length === 0} style={{ padding: '10px 20px',
+          backgroundColor: '#0070f3',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer', }}>
+          UNDO
+        </button>
+        <button onClick={handleRedo} disabled={state.future.length === 0}style={{padding: '10px 20px',
+          backgroundColor: '#0070f3',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',}}>
+          REDO
+        </button>
+      </div>
+      {isPending && <div>LOADING...</div>}
     </div>
   );
 }
