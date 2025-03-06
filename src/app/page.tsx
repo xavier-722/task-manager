@@ -70,10 +70,10 @@ const taskReducer = (state: State, action: Action): State => {
   }
 };
 
-export default function TaskManager() {
+function TaskManager({ initialTasks }: { initialTasks: Task[] }) {
   const [state, dispatch] = useReducer(taskReducer, {
     past: [],
-    present: [],
+    present: initialTasks,
     future: [],
   } as State);
   const [isPending, startTransition] = useTransition();
@@ -147,24 +147,21 @@ export default function TaskManager() {
       />
       <TaskList tasks={state.present} onEdit={setEditTask} onDelete={handleDeleteTask} />
       <div style={{ marginTop: '20px' }}>
-        <button onClick={handleUndo} disabled={state.past.length === 0} style={{ padding: '10px 20px',
-          backgroundColor: '#0070f3',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer', }}>
+        <button onClick={handleUndo} disabled={state.past.length === 0} loading={isPending}
+          style={{ padding: '10px 20px', backgroundColor: '#0070f3', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
           UNDO
         </button>
-        <button onClick={handleRedo} disabled={state.future.length === 0}style={{padding: '10px 20px',
-          backgroundColor: '#0070f3',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',}}>
+        <button onClick={handleRedo} disabled={state.future.length === 0} loading={isPending}
+          style={{ padding: '10px 20px', backgroundColor: '#0070f3', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
           REDO
         </button>
       </div>
       {isPending && <div>LOADING...</div>}
     </div>
   );
+}
+
+export default async function pages() {
+  const initialTasks = await getTasks();
+  return <TaskManager initialTasks={initialTasks} />;
 }

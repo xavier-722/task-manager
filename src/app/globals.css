@@ -1,8 +1,9 @@
 @import "tailwindcss";
-
+@import '@Mantine/Notifications/styles.css';
+@import '@mantine/core/styles.css';
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #090909;
+  --foreground: #c7b0b0;
 }
 
 @theme inline {
@@ -14,7 +15,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #d8cbcb;
     --foreground: #ededed;
   }
 }
